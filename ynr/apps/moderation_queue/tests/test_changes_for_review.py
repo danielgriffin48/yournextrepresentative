@@ -3,23 +3,23 @@ import os
 from datetime import datetime, timedelta
 from io import BytesIO
 
+import people.tests.factories
+from candidates.models import LoggedAction
+from candidates.models.db import ActionType
+from candidates.tests.auth import TestUserMixin
+from candidates.tests.uk_examples import UK2015ExamplesMixin
 from django.conf import settings
 from django.test import TestCase
 from django.utils.timezone import make_aware
 from django_webtest import WebTest
+from django.contrib.auth.models import User
 from lxml import etree
 from mock import patch
-
-import people.tests.factories
-from candidates.models import LoggedAction
-from candidates.models.db import ActionType
-from candidates.tests.uk_examples import UK2015ExamplesMixin
 from moderation_queue.review_required_helper import PREVIOUSLY_APPROVED_COUNT
 from parties.models import Party
 from people.models import Person
 from people.tests.test_version_diffs import tidy_html_whitespace
-
-from candidates.tests.auth import TestUserMixin
+from ynr.apps.moderation_queue.review_required_helper import ReviewType
 
 
 def random_person_id():
@@ -144,6 +144,7 @@ class TestFlaggedEdits(UK2015ExamplesMixin, TestUserMixin, WebTest):
                 source="Just for tests...",
             )
         self.assertEqual(LoggedAction.objects.all().count(), 20)
+
         response = self.app.get(
             "/person/{person_id}/update".format(person_id=example_person.id),
             user=self.user,
@@ -256,6 +257,118 @@ class TestFlaggedEdits(UK2015ExamplesMixin, TestUserMixin, WebTest):
             ).count(),
             PREVIOUSLY_APPROVED_COUNT + 1,
         )
+
+    def update_person(self, user, example_person):
+        response = self.app.get(
+            "/person/{person_id}/update".format(person_id=example_person.id),
+            user=self.user,
+        )
+
+        form_data = response.forms["person-details"]
+        form_data["favourite_biscuit"] = "Jammy Dodgers"
+        form_data["source"] = "A biscuit update for testing purposes"
+        form_data.submit()
+        example_person.refresh_from_db()
+        self.assertEqual(example_person.favourite_biscuit, "Jammy Dodgers")
+
+        form_data = response.forms["person-details"]
+        form_data["favourite_biscuit"] = "Chocolate Chip"
+        form_data["source"] = "Another biscuit update for testing purposes"
+        form_data.submit()
+        example_person.refresh_from_db()
+
+        self.assertEqual(example_person.favourite_biscuit, "Chocolate Chip")
+
+        form_data = response.forms["person-details"]
+        form_data["favourite_biscuit"] = "Coconut"
+        form_data["source"] = "Another biscuit update for good measure"
+        form_data.submit()
+        example_person.refresh_from_db()
+
+        self.assertEqual(example_person.favourite_biscuit, "Coconut")
+
+        versions_data = example_person.versions
+        self.assertEqual(len(versions_data), 3)
+        self.assertEqual(LoggedAction.objects.count(), 3)
+        self.assertEqual(
+            LoggedAction.objects.filter(action_type="person-update").count(), 3
+        )
+
+        response = self.app.get("/", user=self.user)
+        self.user.is_active = False
+        self.user.save()
+        response = self.app.get("/")
+        self.assertIn("Sign in to edit", response.text)
+
+    def revert_edit_to_person(self, example_person):
+        self.user = User.objects.all()[3]
+
+        # create a user history
+        for i in range(4):
+            la = LoggedAction.objects.create(
+                id=(1500 + i),
+                user=self.user,
+                action_type=ActionType.PERSON_UPDATE,
+                person=example_person,
+                popit_person_new_version=random_person_id(),
+                source="Just for tests...",
+            )
+
+        versions_data = example_person.versions
+        self.assertEqual(len(versions_data), 3)
+
+        # we want the revert to come from a different user
+        response = self.app.get(
+            "/person/{person_id}/update".format(person_id=example_person.id),
+            user=self.user,
+        )
+        version_id = example_person.versions[1]["version_id"]
+        revert_form = response.forms[
+            "revert-form-{version_id}".format(version_id=version_id)
+        ]
+        revert_form[
+            "source"
+        ] = "Reverting to version {version_id} for testing purposes"
+        revert_form.submit()
+        example_person.refresh_from_db()
+
+        self.assertIn("Signed in as", response.text)
+        self.assertNotEqual(self.user.username, "john")
+        self.assertEqual(example_person.favourite_biscuit, "Chocolate Chip")
+        self.assertEqual(LoggedAction.objects.count(), 8)
+
+    def test_reverted_user_edit_needs_review(self, change_metadata=True):
+        """Test that reverted edits are flagged for review"""
+        self.assertFalse(LoggedAction.objects.needs_review().exists())
+        # create a person
+        example_person = people.tests.factories.PersonFactory.create(
+            id=4758, name="Phil Hutty", favourite_biscuit="Gingerbread"
+        )
+        # create a candidacy for reverting later
+        example_person.memberships.create(
+            ballot=self.local_ballot,
+            party=self.green_party,
+            post=self.local_ballot.post,
+        )
+
+        user = self.user
+
+        # update person and record a new version
+        self.update_person(user, example_person)
+
+        # revert to previous version
+        self.revert_edit_to_person(example_person)
+
+        # check revert action is logged
+        self.assertEqual(
+            LoggedAction.objects.filter(action_type="person-revert").count(), 1
+        )
+
+        las = LoggedAction.objects.all()
+        las_ordered = LoggedAction.objects.all().order_by("updated")
+        last_revert = las_ordered.last()
+        self.assertEqual(last_revert.action_type, "person-revert")
+        self.assertIn(last_revert, las.needs_review())
 
 
 @patch.object(Person, "diff_for_version", fake_diff_html)

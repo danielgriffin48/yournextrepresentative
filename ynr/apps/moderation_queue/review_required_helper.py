@@ -216,6 +216,26 @@ class CandidateCurrentNameDecider(BaseReviewRequiredDecider):
             return self.Status.UNDECIDED
 
 
+class RevertedEditByAnotherUser(BaseReviewRequiredDecider):
+    def review_description_text(self):
+        return "Edit reverted by another user"
+
+    def needs_review(self):
+        from candidates.models import LoggedAction
+
+        if self.logged_action.action_type == "person-revert":
+            update_qs = LoggedAction.objects.filter(
+                person=self.logged_action.person, action_type="person-update"
+            ).order_by("updated")
+            # filter out edits that have the current user as the user
+            update_qs = update_qs.exclude(user=self.logged_action.user)
+            # find the last edit made by another user
+            if update_qs.exists():
+                if self.logged_action.user != update_qs.last().user:
+                    return self.Status.NEEDS_REVIEW
+            return self.Status.UNDECIDED
+
+
 class EditTypesThatNeverNeedReview(BaseReviewRequiredDecider):
     def review_description_text(self):
         return "Type of edit that never needs a review"
@@ -269,6 +289,11 @@ REVIEW_TYPES = (
         type="needs_review_due_to_current_candidate_name_change",
         label="Edit of name of current candidate",
         cls=CandidateCurrentNameDecider,
+    ),
+    ReviewType(
+        type="needs_review_due_to_reverted_edit_by_another_user",
+        label="Edit reverted by another user",
+        cls=RevertedEditByAnotherUser,
     ),
 )
 
