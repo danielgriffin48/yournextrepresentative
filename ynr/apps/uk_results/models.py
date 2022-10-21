@@ -124,6 +124,8 @@ class CandidateResult(TimeStampedModel):
         help_text="Did this person win after receiving same votes as another candidate, via coin toss, lots etc",
     )
 
+    winning_position = models.PositiveIntegerField()
+
     class Meta:
         ordering = ("-num_ballots",)
         unique_together = (("result_set", "membership"),)
