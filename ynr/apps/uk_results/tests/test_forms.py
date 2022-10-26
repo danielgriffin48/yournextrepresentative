@@ -19,7 +19,7 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
         self.people = [
             PersonFactory.create(id=13, name="Alice"),
             PersonFactory.create(id=14, name="Bob"),
-            PersonFactory.create(id=15, name="Carol"),
+            PersonFactory.create(id=15, name="Carol")
         ]
 
         parties = [self.labour_party, self.conservative_party, self.ld_party]
@@ -253,10 +253,9 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
             rank += 1
 
         form.cleaned_data = cleaned_data
-        print(form.get_winning_position())
         self.assertEqual(form.get_winning_position(), expected_ranking)
 
-    def test_winning_rank_with_tied_losers(self):
+    def test_winning_rank_with_only_tied_losers(self):
         """
         Where two candidates have equal votes but neither were elected, these should have the same rank.
         """
@@ -278,6 +277,30 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
             expected_ranking.append((f"memberships_{candidate.person.pk}", 2))
 
         form.cleaned_data = cleaned_data
-        print(form.get_winning_position())
         self.assertEqual(form.get_winning_position(), expected_ranking)
+
+    def test_winning_rank_with_tie_break(self):
+        """
+        Two candidates are tied, one is elected and one not. Candidates should be rank n and n+1.
+        """
+        form = ResultSetForm(ballot=self.ballot)
+        cleaned_data = {}
+        expected_ranking = []
+        tied_winner, tied_loser, third_place = self.candidacies
+
+        #setup winner
+
+        cleaned_data[f"memberships_{tied_winner.person.pk}"] = 1000
+        cleaned_data[f"tied_vote_memberships_{tied_winner.person.pk}"] = True
+        expected_ranking.append((f"memberships_{tied_winner.person.pk}", 1))
+        cleaned_data[f"memberships_{tied_loser.person.pk}"] = 1000
+        cleaned_data[f"tied_vote_memberships_{tied_loser.person.pk}"] = False
+        expected_ranking.append((f"memberships_{tied_loser.person.pk}", 2))
+        cleaned_data[f"memberships_{third_place.person.pk}"] = 800
+        cleaned_data[f"tied_vote_memberships_{third_place.person.pk}"] = False
+        expected_ranking.append((f"memberships_{third_place.person.pk}", 3))
+
+        form.cleaned_data = cleaned_data
+        self.assertEqual(form.get_winning_position(), expected_ranking)
+
 
