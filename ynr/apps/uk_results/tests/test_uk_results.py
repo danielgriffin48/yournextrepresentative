@@ -130,3 +130,5 @@ class TestUKResults(TestUserMixin, UK2015ExamplesMixin, TestCase):
         result = ResultSet(num_turnout_reported=100, total_electorate=50)
         result.calculate_turnout_percentage()
         self.assertEqual(result.turnout_percentage, 100)
+
+
