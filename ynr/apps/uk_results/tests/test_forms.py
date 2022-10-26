@@ -235,3 +235,24 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
             form.errors,
             {"source": ["Source must be less than 2,000 characters"]},
         )
+
+    def test_winning_rank_with_clear_winner(self):
+        """
+        Test that where candidates have different number of votes the one with the most is ranked one.
+        """
+        form = ResultSetForm(ballot=self.ballot)
+        cleaned_data = {}
+        votes = 1000
+        rank = 1
+        expected_ranking = []
+        for candidate in self.candidacies:
+            cleaned_data[f"memberships_{candidate.person.pk}"] = votes
+            cleaned_data[f"tied_vote_memberships_{candidate.person.pk}"] = False
+            expected_ranking.append((f"memberships_{candidate.person.pk}", rank))
+            votes -= 10
+            rank += 1
+
+        form.cleaned_data = cleaned_data
+        print(form.get_winning_position())
+        self.assertEqual(form.get_winning_position(), expected_ranking)
+

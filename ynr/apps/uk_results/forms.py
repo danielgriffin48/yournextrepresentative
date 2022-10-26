@@ -220,3 +220,40 @@ class ResultSetForm(forms.ModelForm):
                 winners.append(result)
 
         return dict(winners)
+
+    def get_winning_position(self):
+        """
+        Return a dictionary of fieldname, winning position for each of candidate.
+        """
+
+        results = {field: votes for field, votes in self.cleaned_data.items() if field.startswith("memberships_")}
+
+        # builds a list of tuples made up of (fieldname, num votes)
+        sorted_results = sorted(
+            results.items(), reverse=True, key=lambda result: result[1]
+        )
+
+        current_rank = 1
+        last_candidate_votes = sorted_results[0][1]
+        rank_order = [(sorted_results[0][0], 1)]
+        for result in sorted_results[1:]:
+            print(result)
+            membership_id = result[0]
+            num_votes = result[1]
+            # if less votes than previous - rank is current_rank+1
+            if num_votes < last_candidate_votes:
+                current_rank += 1
+                rank_order.append((membership_id, current_rank))
+
+            # if votes equal and went to a tie break, then winner is rank n and loser rank n+1
+            elif last_candidate_votes == num_votes and len(self._tied_vote_winners) == 0:
+                rank_order.append((membership_id, current_rank))
+
+           # elif last_candidate_votes == num_votes and len(self._tied_vote_winners) != 0:
+
+
+
+            # if votes are equal and did not go to tie break then all candidates with same score have same rank
+
+
+        return rank_order

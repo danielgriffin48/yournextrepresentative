@@ -124,7 +124,7 @@ class CandidateResult(TimeStampedModel):
         help_text="Did this person win after receiving same votes as another candidate, via coin toss, lots etc",
     )
 
-    winning_position = models.PositiveIntegerField()
+    winning_position = models.PositiveIntegerField(default=None, blank=True, null=True)
 
     class Meta:
         ordering = ("-num_ballots",)
