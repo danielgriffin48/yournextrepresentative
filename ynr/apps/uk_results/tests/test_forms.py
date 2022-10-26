@@ -256,3 +256,28 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
         print(form.get_winning_position())
         self.assertEqual(form.get_winning_position(), expected_ranking)
 
+    def test_winning_rank_with_tied_losers(self):
+        """
+        Where two candidates have equal votes but neither were elected, these should have the same rank.
+        """
+        form = ResultSetForm(ballot=self.ballot)
+        cleaned_data = {}
+        votes = 1000
+        rank = 1
+        expected_ranking = []
+
+        #setup winner
+        cleaned_data[f"memberships_{self.candidacies[0].person.pk}"] = 1000
+        cleaned_data[f"tied_vote_memberships_{self.candidacies[0].person.pk}"] = False
+        expected_ranking.append((f"memberships_{self.candidacies[0].person.pk}", 1))
+
+        # remaining candidates as tied
+        for candidate in self.candidacies[1:]:
+            cleaned_data[f"memberships_{candidate.person.pk}"] = 50
+            cleaned_data[f"tied_vote_memberships_{candidate.person.pk}"] = False
+            expected_ranking.append((f"memberships_{candidate.person.pk}", 2))
+
+        form.cleaned_data = cleaned_data
+        print(form.get_winning_position())
+        self.assertEqual(form.get_winning_position(), expected_ranking)
+
