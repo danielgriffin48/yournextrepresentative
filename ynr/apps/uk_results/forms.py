@@ -138,16 +138,20 @@ class ResultSetForm(forms.ModelForm):
                 #  otherwise we cant be sure who was elected
                 self.ballot.membership_set.update(elected=None)
 
+            winning_positions = self.get_winning_position()
             recorder = RecordBallotResultsHelper(self.ballot, instance.user)
             for membership, field_name in self.memberships:
                 tied_vote_winner = self.cleaned_data[f"tied_vote_{field_name}"]
                 num_votes = self.cleaned_data[field_name]
                 winner = field_name in winners
+                winning_position = field_name in winning_positions
+
                 instance.candidate_results.update_or_create(
                     membership=membership,
                     defaults={
                         "num_ballots": num_votes,
                         "tied_vote_winner": tied_vote_winner,
+                        "winning_position" : winning_position
                     },
                 )
                 if winner:
