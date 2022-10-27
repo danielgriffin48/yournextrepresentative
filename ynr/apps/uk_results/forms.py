@@ -252,7 +252,7 @@ class ResultSetForm(forms.ModelForm):
         print(results)
         current_rank = 1
         previous_candidate_votes = sorted_results[0][1]
-        rank_order = [(sorted_results[0][0], 1)]
+        rank_order = {sorted_results[0][0] : 1}
 
         for result in sorted_results[1:]:
             membership_id = result[0]
@@ -260,11 +260,11 @@ class ResultSetForm(forms.ModelForm):
             # if less votes than previous - rank is current_rank+1
             if num_votes < previous_candidate_votes:
                 current_rank += 1
-                rank_order.append((membership_id, current_rank))
+                rank_order[membership_id] = current_rank
                 previous_candidate_votes = num_votes
 
             # if votes equal and went to a tie break, then winner is rank n and loser rank n+1
             elif previous_candidate_votes == num_votes:
-                rank_order.append((membership_id, current_rank))
+                rank_order[membership_id] = current_rank
 
         return rank_order
