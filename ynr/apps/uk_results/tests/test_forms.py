@@ -244,11 +244,11 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
         cleaned_data = {}
         votes = 1000
         rank = 1
-        expected_ranking = []
+        expected_ranking = {}
         for candidate in self.candidacies:
             cleaned_data[f"memberships_{candidate.person.pk}"] = votes
             cleaned_data[f"tied_vote_memberships_{candidate.person.pk}"] = False
-            expected_ranking.append((f"memberships_{candidate.person.pk}", rank))
+            expected_ranking[f"memberships_{candidate.person.pk}"] = rank
             votes -= 10
             rank += 1
 
@@ -263,18 +263,18 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
         cleaned_data = {}
         votes = 1000
         rank = 1
-        expected_ranking = []
+        expected_ranking = {}
 
         #setup winner
         cleaned_data[f"memberships_{self.candidacies[0].person.pk}"] = 1000
         cleaned_data[f"tied_vote_memberships_{self.candidacies[0].person.pk}"] = False
-        expected_ranking.append((f"memberships_{self.candidacies[0].person.pk}", 1))
+        expected_ranking[f"memberships_{self.candidacies[0].person.pk}"] = 1
 
         # remaining candidates as tied
         for candidate in self.candidacies[1:]:
             cleaned_data[f"memberships_{candidate.person.pk}"] = 50
             cleaned_data[f"tied_vote_memberships_{candidate.person.pk}"] = False
-            expected_ranking.append((f"memberships_{candidate.person.pk}", 2))
+            expected_ranking[f"memberships_{candidate.person.pk}"] = 2
 
         form.cleaned_data = cleaned_data
         self.assertEqual(form.get_winning_position(), expected_ranking)
@@ -285,20 +285,20 @@ class TestResultSetForm(TestUserMixin, UK2015ExamplesMixin, WebTest, TestCase):
         """
         form = ResultSetForm(ballot=self.ballot)
         cleaned_data = {}
-        expected_ranking = []
+        expected_ranking = {}
         tied_winner, tied_loser, third_place = self.candidacies
 
         #setup winner
 
         cleaned_data[f"memberships_{tied_winner.person.pk}"] = 1000
         cleaned_data[f"tied_vote_memberships_{tied_winner.person.pk}"] = True
-        expected_ranking.append((f"memberships_{tied_winner.person.pk}", 1))
+        expected_ranking[f"memberships_{tied_winner.person.pk}"] = 1
         cleaned_data[f"memberships_{tied_loser.person.pk}"] = 1000
         cleaned_data[f"tied_vote_memberships_{tied_loser.person.pk}"] = False
-        expected_ranking.append((f"memberships_{tied_loser.person.pk}", 2))
+        expected_ranking[f"memberships_{tied_loser.person.pk}"] = 2
         cleaned_data[f"memberships_{third_place.person.pk}"] = 800
         cleaned_data[f"tied_vote_memberships_{third_place.person.pk}"] = False
-        expected_ranking.append((f"memberships_{third_place.person.pk}", 3))
+        expected_ranking[f"memberships_{third_place.person.pk}"] = 3
 
         form.cleaned_data = cleaned_data
         self.assertEqual(form.get_winning_position(), expected_ranking)
